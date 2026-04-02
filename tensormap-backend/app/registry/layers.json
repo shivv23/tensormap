@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "layers": [
+    {
+      "type_id": "custominput",
+      "display_name": "Input",
+      "category": "Core",
+      "description": "Input layer for feeding data into the neural network",
+      "keras_key": "input",
+      "params": [
+        {
+          "key": "dim-1",
+          "label": "Dimension 1",
+          "type": "int",
+          "required": false,
+          "default": null,
+          "help_text": "First dimension of input shape"
+        },
+        {
+          "key": "dim-2",
+          "label": "Dimension 2",
+          "type": "int",
+          "required": false,
+          "default": null,
+          "help_text": "Second dimension of input shape"
+        },
+        {
+          "key": "dim-3",
+          "label": "Dimension 3",
+          "type": "int",
+          "required": false,
+          "default": null,
+          "help_text": "Third dimension of input shape"
+        }
+      ]
+    },
+    {
+      "type_id": "customdense",
+      "display_name": "Dense",
+      "category": "Core",
+      "description": "Fully connected dense layer",
+      "keras_key": "dense",
+      "params": [
+        {
+          "key": "units",
+          "label": "Units",
+          "type": "int",
+          "required": true,
+          "default": 128,
+          "constraints": {
+            "min": 1,
+            "max": 4096
+          },
+          "help_text": "Number of neurons in the layer"
+        },
+        {
+          "key": "activation",
+          "label": "Activation",
+          "type": "enum",
+          "required": false,
+          "default": "relu",
+          "options": ["relu", "sigmoid", "tanh", "softmax", "none", "linear", "leaky_relu", "elu"],
+          "help_text": "Activation function to use"
+        }
+      ]
+    },
+    {
+      "type_id": "customflatten",
+      "display_name": "Flatten",
+      "category": "Utility",
+      "description": "Flattens the input without affecting the batch size",
+      "keras_key": "flatten",
+      "params": []
+    },
+    {
+      "type_id": "customconv",
+      "display_name": "Conv2D",
+      "category": "CNN",
+      "description": "2D Convolutional layer for spatial feature extraction",
+      "keras_key": "conv2d",
+      "params": [
+        {
+          "key": "filter",
+          "label": "Filters",
+          "type": "int",
+          "required": true,
+          "default": 32,
+          "constraints": {
+            "min": 1,
+            "max": 1024
+          },
+          "help_text": "Number of convolutional filters"
+        },
+        {
+          "key": "kernelX",
+          "label": "Kernel Width",
+          "type": "int",
+          "required": true,
+          "default": 3,
+          "constraints": {
+            "min": 1,
+            "max": 31
+          },
+          "help_text": "Kernel size along X axis"
+        },
+        {
+          "key": "kernelY",
+          "label": "Kernel Height",
+          "type": "int",
+          "required": true,
+          "default": 3,
+          "constraints": {
+            "min": 1,
+            "max": 31
+          },
+          "help_text": "Kernel size along Y axis"
+        },
+        {
+          "key": "strideX",
+          "label": "Stride X",
+          "type": "int",
+          "required": false,
+          "default": 1,
+          "constraints": {
+            "min": 1,
+            "max": 16
+          },
+          "help_text": "Stride along X axis"
+        },
+        {
+          "key": "strideY",
+          "label": "Stride Y",
+          "type": "int",
+          "required": false,
+          "default": 1,
+          "constraints": {
+            "min": 1,
+            "max": 16
+          },
+          "help_text": "Stride along Y axis"
+        },
+        {
+          "key": "padding",
+          "label": "Padding",
+          "type": "enum",
+          "required": false,
+          "default": "same",
+          "options": ["same", "valid"],
+          "help_text": "Padding mode"
+        },
+        {
+          "key": "activation",
+          "label": "Activation",
+          "type": "enum",
+          "required": false,
+          "default": "relu",
+          "options": ["relu", "sigmoid", "tanh", "softmax", "none", "linear", "leaky_relu", "elu"],
+          "help_text": "Activation function to use"
+        }
+      ]
+    },
+    {
+      "type_id": "customdropout",
+      "display_name": "Dropout",
+      "category": "Regularization",
+      "description": "Dropout layer for regularization",
+      "keras_key": "dropout",
+      "params": [
+        {
+          "key": "rate",
+          "label": "Rate",
+          "type": "float",
+          "required": false,
+          "default": 0.5,
+          "constraints": {
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.1
+          },
+          "help_text": "Fraction of input units to drop"
+        }
+      ]
+    }
+  ]
+}

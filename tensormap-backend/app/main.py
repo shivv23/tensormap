@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.exceptions import AppException, app_exception_handler, generic_exception_handler
 from app.middleware import RequestLoggingMiddleware
+from app.registry.loader import RegistryError, RegistryLoader
 from app.routers import data_process, data_upload, deep_learning, project
 from app.shared.logging_config import get_logger
 from app.socketio_instance import sio
@@ -30,6 +31,17 @@ async def lifespan(app: FastAPI):
     alembic_cfg = Config("alembic.ini")
     command.upgrade(alembic_cfg, "head")
     logger.info("Alembic migrations complete")
+
+    # Load and validate layer registry
+    logger.info("Loading layer registry...")
+    try:
+        registry = RegistryLoader.load()
+        app.state.layer_registry = registry
+        logger.info("Layer registry loaded successfully with %d layer types", len(registry.layers))
+    except RegistryError as e:
+        logger.error("Failed to load layer registry: %s", e)
+        raise RuntimeError(f"Layer registry initialization failed: {e}") from e
+
     yield
 
 

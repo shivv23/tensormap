@@ -1,7 +1,8 @@
-"""HTTP request/response logging middleware."""
+"""HTTP request/response logging and tracing middleware."""
 
 import re
 import time
+import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -16,10 +17,20 @@ _INT_SEGMENT_RE = re.compile(r"(?<=/)\d+(?=/|$)")
 
 
 def _sanitize_path(path: str) -> str:
-    """Replace UUID and numeric path segments with {id} to avoid logging PII."""
     path = _UUID_RE.sub("{id}", path)
     path = _INT_SEGMENT_RE.sub("{id}", path)
     return path
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        request_id = request.headers.get("X-Request-ID")
+        if not request_id:
+            request_id = str(uuid.uuid4())
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):

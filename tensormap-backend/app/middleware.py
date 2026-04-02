@@ -1,7 +1,8 @@
-"""HTTP request/response logging middleware."""
+"""HTTP request/response logging and tracing middleware."""
 
 import re
 import time
+import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -20,6 +21,31 @@ def _sanitize_path(path: str) -> str:
     path = _UUID_RE.sub("{id}", path)
     path = _INT_SEGMENT_RE.sub("{id}", path)
     return path
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Add a unique request ID to each request for tracing.
+
+    The request ID is generated if not provided in the request headers,
+    and is added to the response as X-Request-ID header.
+    """
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        # Check if client provided a request ID, otherwise generate one
+        request_id = request.headers.get("X-Request-ID")
+        if not request_id:
+            request_id = str(uuid.uuid4())
+
+        # Store in request state for downstream access
+        request.state.request_id = request_id
+
+        # Process the request
+        response = await call_next(request)
+
+        # Add request ID to response headers
+        response.headers["X-Request-ID"] = request_id
+
+        return response
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):

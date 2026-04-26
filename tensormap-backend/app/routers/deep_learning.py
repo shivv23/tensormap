@@ -10,7 +10,9 @@ from app.database import get_db
 from app.schemas.deep_learning import ModelNameRequest, ModelSaveRequest, ModelValidateRequest, TrainingConfigRequest
 from app.services.deep_learning import (
     compare_runs_service,
+    create_ensemble_service,
     delete_model_service,
+    ensemble_predict_service,
     export_model_service,
     get_available_model_list,
     get_code_service,
@@ -165,4 +167,44 @@ def tune_hyperparameters(
     """Perform hyperparameter tuning for a model via grid search."""
     logger.debug("Tuning hyperparameters for %s", model_name)
     body, status_code = tune_hyperparameters_service(db, model_name=model_name, file_id=file_id, project_id=project_id)
+    return JSONResponse(status_code=status_code, content=body)
+
+
+@router.post("/model/ensemble/create")
+def create_ensemble(
+    ensemble_name: str,
+    model_names: list[str],
+    method: str = Query("voting", pattern="^(voting|stacking)$"),
+    project_id: uuid_pkg.UUID | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Register an ensemble of multiple trained models.
+
+    Use case: Combine multiple models for better predictions.
+    """
+    logger.debug("Creating ensemble '%s' with %d models", ensemble_name, len(model_names))
+    body, status_code = create_ensemble_service(
+        db, model_names=model_names, ensemble_name=ensemble_name, method=method, project_id=project_id
+    )
+    return JSONResponse(status_code=status_code, content=body)
+
+
+@router.post("/model/ensemble/predict")
+def ensemble_predict(
+    model_names: list[str],
+    file_id: uuid_pkg.UUID,
+    method: str = Query("voting", pattern="^(voting|stacking)$"),
+    project_id: uuid_pkg.UUID | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Make predictions using an ensemble of trained models.
+
+    Methods:
+    - voting: Majority vote (classification) or average (regression)
+    - stacking: Use base model predictions as features for meta-learner
+    """
+    logger.debug("Ensemble predict with %d models, method=%s", len(model_names), method)
+    body, status_code = ensemble_predict_service(
+        db, model_names=model_names, file_id=file_id, method=method, project_id=project_id
+    )
     return JSONResponse(status_code=status_code, content=body)

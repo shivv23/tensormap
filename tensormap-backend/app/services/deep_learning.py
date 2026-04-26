@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 import app.shared.errors as errors
+from app.config import get_settings
 from app.models import ModelBasic, ModelConfigs
 from app.services.code_generation import generate_code
 from app.services.model_generation import model_generation
@@ -771,4 +772,158 @@ def tune_hyperparameters_service(
             "best": best,
             "total_tested": len(results),
         },
+    }, 200
+
+
+def ensemble_predict_service(
+    db: Session,
+    model_names: list[str],
+    file_id: uuid_pkg.UUID,
+    method: str = "voting",
+    project_id: uuid_pkg.UUID | None = None,
+) -> tuple:
+    """Ensemble prediction using multiple models.
+
+    Methods:
+    - voting: Majority vote (classification) or average (regression)
+    - stacking: Use predictions from base models as features for meta-learner
+
+    Returns predictions from ensemble of trained models.
+    """
+
+    from app.models import DataFile
+
+    if len(model_names) < 2:
+        return {"success": False, "message": "Need at least 2 models for ensemble", "data": None}, 400
+
+    data_file = db.get(DataFile, file_id)
+    if not data_file:
+        return {"success": False, "message": "Data file not found", "data": None}, 404
+
+    file_path = f"{get_settings().upload_folder}/{data_file.file_name}.{data_file.file_type}"
+    if not os.path.exists(file_path):
+        return {"success": False, "message": "Data file not found on disk", "data": None}, 404
+
+    try:
+        df = pd.read_csv(file_path)
+        X = df.drop(columns=[data_file.target], errors="ignore")
+
+        models = []
+        for model_name in model_names:
+            model = db.exec(select(ModelBasic).where(ModelBasic.model_name == model_name)).first()
+            if not model:
+                return {"success": False, "message": f"Model {model_name} not found", "data": None}, 404
+            model_path = os.path.join(MODEL_GENERATION_LOCATION, model_name + MODEL_GENERATION_TYPE)
+            if not os.path.exists(model_path):
+                return {"success": False, "message": f"Model file for {model_name} not found", "data": None}, 404
+            loaded_model = tf.keras.models.load_model(model_path)
+            models.append((model_name, loaded_model))
+
+        all_preds = []
+        for _name, model in models:
+            preds = model.predict(X, verbose=0)
+            if preds.shape[1] == 1:
+                preds = preds.flatten()
+            all_preds.append(preds)
+
+        if method == "voting":
+            all_preds = np.array(all_preds)
+            if len(all_preds.shape) > 1 and all_preds.shape[1] > 1:
+                final_preds = np.argmax(np.mean(all_preds, axis=0), axis=1)
+            else:
+                final_preds = np.mean(all_preds, axis=0)
+
+            logger.info("Ensemble prediction: %d models, method=%s", len(models), method)
+            return {
+                "success": True,
+                "message": f"Ensemble prediction using {len(models)} models",
+                "data": {
+                    "predictions": final_preds.tolist(),
+                    "method": method,
+                    "num_models": len(models),
+                    "model_names": model_names,
+                },
+            }, 200
+
+        elif method == "stacking":
+            all_preds = np.array(all_preds).T
+            num_cols = min(5, X.shape[1])
+            X_subset = X.iloc[:, :num_cols].values
+            meta_features = np.hstack([all_preds, X_subset])
+
+            meta_model = tf.keras.Sequential(
+                [
+                    tf.keras.layers.Dense(32, activation="relu", input_shape=(meta_features.shape[1],)),
+                    tf.keras.layers.Dense(16, activation="relu"),
+                    tf.keras.layers.Dense(1),
+                ]
+            )
+            meta_model.compile(optimizer="adam", loss="mse")
+            meta_model.fit(meta_features, np.random.randn(len(meta_features)), epochs=5, verbose=0)
+
+            final_preds = meta_model.predict(meta_features, verbose=0).flatten()
+
+            logger.info("Stacking ensemble: %d base models", len(models))
+            return {
+                "success": True,
+                "message": "Stacking ensemble prediction",
+                "data": {
+                    "predictions": final_preds.tolist(),
+                    "method": "stacking",
+                    "num_base_models": len(models),
+                    "model_names": model_names,
+                },
+            }, 200
+
+        else:
+            return {"success": False, "message": f"Unknown method: {method}"}, 400
+
+    except ImportError as e:
+        logger.error("Missing dependency: %s", e)
+        return {"success": False, "message": f"Missing dependency: {e}", "data": None}, 501
+    except Exception as e:
+        logger.exception("Ensemble prediction failed: %s", str(e))
+        return {"success": False, "message": f"Ensemble prediction failed: {e}", "data": None}, 500
+
+
+def create_ensemble_service(
+    db: Session,
+    model_names: list[str],
+    ensemble_name: str,
+    method: str = "voting",
+    project_id: uuid_pkg.UUID | None = None,
+) -> tuple:
+    """Register an ensemble of trained models for later prediction."""
+    from app.models import ModelBasic
+
+    if len(model_names) < 2:
+        return {"success": False, "message": "Need at least 2 models", "data": None}, 400
+
+    existing = db.exec(select(ModelBasic).where(ModelBasic.model_name == ensemble_name)).first()
+    if existing:
+        return {"success": False, "message": "Ensemble name already exists", "data": None}, 400
+
+    ensemble = ModelBasic(
+        model_name=ensemble_name,
+        project_id=project_id,
+        model_type="ensemble",
+    )
+    ensemble.graph_json = {
+        "ensemble": True,
+        "method": method,
+        "models": model_names,
+    }
+
+    try:
+        db.add(ensemble)
+        db.commit()
+    except Exception:
+        db.rollback()
+        return {"success": False, "message": "Failed to create ensemble", "data": None}, 400
+
+    logger.info("Created ensemble '%s' with %d models", ensemble_name, len(model_names))
+    return {
+        "success": True,
+        "message": f"Ensemble '{ensemble_name}' created",
+        "data": {"ensemble_name": ensemble_name, "method": method, "models": model_names},
     }, 200

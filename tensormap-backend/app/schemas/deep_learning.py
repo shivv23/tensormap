@@ -106,4 +106,13 @@ class TrainingConfigRequest(BaseModel):
     metric: str = Field(min_length=1)
     epochs: int = Field(gt=0)
     batch_size: int = Field(default=32, gt=0)
+    # Early stopping configuration
+    early_stopping_patience: int | None = Field(default=None, ge=1)
+    early_stopping_mode: str = Field(default="auto")
+    # Model checkpointing
+    save_best_only: bool = Field(default=True)
+    # Learning rate scheduler
+    lr_scheduler: str | None = Field(default=None)
+    lr_decay_steps: int | None = Field(default=None, ge=1)
+    lr_initial_rate: float | None = Field(default=None, ge=0)
     project_id: uuid_pkg.UUID | None = None

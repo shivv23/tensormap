@@ -1,6 +1,7 @@
 import asyncio
 import os
 
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 from sqlmodel import Session, select
@@ -66,6 +67,52 @@ class CustomProgressBar(tf.keras.callbacks.Callback):
             metric = ""
         _model_result(f"Evaluation Results: {metric} Loss - {logs['loss']:.4f}", 3)
         _model_result("Finish", 4)
+
+
+class BestModelCheckpoint(tf.keras.callbacks.Callback):
+    """Save the best model during training based on validation loss."""
+
+    def __init__(self, checkpoint_path: str, monitor: str = "val_loss", mode: str = "min") -> None:
+        super().__init__()
+        self.checkpoint_path = checkpoint_path
+        self.monitor = monitor
+        self.mode = mode
+        self.best_value = float("inf") if mode == "min" else float("-inf")
+
+    def on_epoch_end(self, epoch: int, logs: dict = None) -> None:
+        current_value = logs.get(self.monitor)
+        if current_value is None:
+            return
+
+        if (self.mode == "min" and current_value < self.best_value) or (
+            self.mode == "max" and current_value > self.best_value
+        ):
+            self.best_value = current_value
+            self.model.save(self.checkpoint_path)
+            _model_result(f"Best model saved (epoch {epoch + 1}): {current_value:.4f}", 1)
+
+
+class LRSchedulerCallback(tf.keras.callbacks.Callback):
+    """Learning rate scheduler callback."""
+
+    def __init__(self, schedule_type: str, decay_steps: int = None, initial_rate: float = None) -> None:
+        super().__init__()
+        self.schedule_type = schedule_type
+        self.decay_steps = decay_steps
+        self.initial_rate = initial_rate
+
+    def on_epoch_begin(self, epoch: int, logs: dict = None) -> None:
+        if self.schedule_type == "step":
+            lr = self.initial_rate * (0.5 ** (epoch // self.decay_steps))
+        elif self.schedule_type == "exponential":
+            lr = self.initial_rate * (0.95**epoch)
+        elif self.schedule_type == "cosine":
+            lr = self.initial_rate * (0.5 * (1 + np.cos(np.pi * epoch / self.decay_steps)))
+        else:
+            lr = self.initial_rate
+
+        tf.keras.backend.set_value(self.model.optimizer.lr, lr)
+        _model_result(f"Learning rate: {lr:.6f}", 1)
 
 
 def _model_result(message: str, test: int) -> None:

@@ -32,7 +32,8 @@
     "lint:fix": "eslint . --ext js,jsx --fix",
     "prettier": "prettier . --write",
     "test": "vitest run",
-    "test:ci": "vitest run --reporter=default"
+    "test:ci": "vitest run --reporter=default",
+    "test:e2e": "playwright test"
   },
   "browserslist": {
     "production": [
@@ -47,6 +48,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "autoprefixer": "^10.4.24",

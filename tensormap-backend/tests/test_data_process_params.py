@@ -51,6 +51,7 @@ def test_get_file_data_csv_success(tmp_path, mock_db, mock_settings):
     mock_file.id = uuid.uuid4()
     mock_file.file_name = "test"
     mock_file.file_type = "csv"
+    mock_file.disk_name = "test.csv"
     mock_db.exec.return_value.first.return_value = mock_file
 
     body, status = get_file_data(mock_db, mock_file.id)

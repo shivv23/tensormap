@@ -113,8 +113,8 @@ def _helper_generate_file_location(db: Session, file_id) -> str:
     upload_folder = get_settings().upload_folder
     file = db.exec(select(DataFile).where(DataFile.id == file_id)).first()
     if file.file_type == "zip":
-        return upload_folder + "/" + file.file_name
-    return upload_folder + "/" + file.file_name + "." + file.file_type
+        return upload_folder + "/" + file.disk_name.rsplit(".", 1)[0]
+    return upload_folder + "/" + file.disk_name
 
 
 def _helper_generate_json_model_file_location(model_name: str) -> str:

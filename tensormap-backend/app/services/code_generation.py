@@ -82,5 +82,5 @@ def _file_location(file_id, db: Session) -> str:
     settings = get_settings()
     file = db.exec(select(DataFile).where(DataFile.id == file_id)).first()
     if file.file_type == "zip":
-        return f"{settings.upload_folder}/{file.file_name}"
-    return f"{settings.upload_folder}/{file.file_name}.{file.file_type}"
+        return f"{settings.upload_folder}/{file.disk_name.rsplit('.', 1)[0]}"
+    return f"{settings.upload_folder}/{file.disk_name}"

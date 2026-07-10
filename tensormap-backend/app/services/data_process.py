@@ -313,9 +313,9 @@ def _zscore_standardize(df: pd.DataFrame, col: str, _params: dict | None) -> pd.
 
 def _log_transform(df: pd.DataFrame, col: str, _params: dict | None) -> pd.DataFrame:
     s = df[col]
-    invalid = int((s < -1).sum())
+    invalid = int((s <= -1).sum())
     if invalid:
-        raise ValueError(f"Log Transform: {invalid} value(s) below -1 in column '{col}'")
+        raise ValueError(f"Log Transform: {invalid} value(s) at or below -1 in column '{col}'")
     df[col] = np.log1p(s)
     return df
 

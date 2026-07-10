@@ -111,7 +111,18 @@ class TestLogTransform:
         df = pd.DataFrame({"price": [1.0, -2.0, 3.0]})
         result, status_code = _run(df, "Log Transform", "price")
         assert status_code == 422
-        assert "below -1" in result["message"]
+        assert "at or below -1" in result["message"]
+
+    def test_rejects_exactly_negative_one(self):
+        df = pd.DataFrame({"price": [0.0, -1.0, 2.0]})
+        result, status_code = _run(df, "Log Transform", "price")
+        assert status_code == 422
+        assert "at or below -1" in result["message"]
+
+    def test_accepts_just_above_negative_one(self):
+        df = pd.DataFrame({"price": [-0.999, 0.0, 1.0]})
+        _, status_code = _run(df, "Log Transform", "price")
+        assert status_code == 200
 
 
 class TestFillMissingValues:
